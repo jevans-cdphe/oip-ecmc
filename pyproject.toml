@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "oip-ecmc"
+version = "0.1.0"
+description = ""
+authors = ["John Evans <john.p.evans@state.co.us>"]
+readme = "README.md"
+packages = [{include = "oip_ecmc"}]
+
+[tool.poetry.dependencies]
+python = "^3.9"
+polars = "^0.20.7"
+spock-config = "^3.1.0"
+wget = "^3.2"
+arrow-odbc = "^4.0.0"
+pyyaml = "^6.0.1"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

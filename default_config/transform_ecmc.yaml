@@ -1,0 +1,48 @@
+log_level: INFO
+ecmc_data_path: ~/Documents/ecmc/
+parquet_directory: ECMC parquet
+log_directory: logs
+output_type: csv
+production_columns_to_keep:
+  - name
+  - operator_num
+  - API_num
+  - Prod_days
+  - gas_btu_sales
+  - gas_sales
+  - gas_shrinkage
+  - gas_used_on_lease
+  - flared_vented
+  - oil_adjustment
+  - oil_gravity
+  - oil_sales
+  - gas_prod
+  - oil_prod
+  - water_prod
+completions_columns_to_keep:
+  - name
+  - operator_num
+  - facility_name
+  - facility_num
+  - well_name
+  - API_num
+  - well_bore_status
+  - county
+  - lat
+  - long
+  - first_prod_date
+  - gas_type
+production_columns_to_fill_null_with_zero:
+  - gas_btu_sales
+  - gas_sales
+  - gas_shrinkage
+  - gas_used_on_lease
+  - flared_vented
+  - oil_adjustment
+  - oil_gravity
+  - oil_sales
+  - gas_prod
+  - oil_prod
+  - water_prod
+completions_columns_to_fill_null_with_zero:
+  - gas_type
