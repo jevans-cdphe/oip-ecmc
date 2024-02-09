@@ -1,4 +1,6 @@
 import datetime
+import hashlib
+import json
 import os
 import pathlib
 from typing import List
@@ -49,32 +51,98 @@ def main() -> None:
     logger = lgr.get_logger(
         'scrape_from_ecmc', config.Config.log_level, log_path + 'scrape_from_ecmc.jsonl')
 
-    # 
-    filenames = get_filenames(config.Config.filename_template, config.Config.years)
+    # generate zip file URLs
+    filenames = {
+        year: config.Config.filename_template.replace('YYYY', str(year)) for year in config.Config.years}
 
+    # get/make paths for zip files
     zip_path = utils.get_dir_path(config.Config.ecmc_data_path, config.Config.zip_directory)
     zip_temp_path = zip_path + 'temp\\'
     pathlib.Path(zip_temp_path).mkdir(parents=True, exist_ok=True)
 
+    # get/make paths for access db files
     access_db_path = utils.get_dir_path(config.Config.ecmc_data_path, config.Config.access_db_directory)
     access_db_previous_versions_path = access_db_path + 'previous_versions\\'
     pathlib.Path(access_db_previous_versions_path).mkdir(parents=True, exist_ok=True)
 
-    pull_from_ecmc(zip_temp_path, filenames, config.Config.production_summary_base_url)
+    # remove files from temp zip directory
+    for f in pathlib.Path(zip_temp_path).glob('*'):
+        os.remove(f)
 
-    # check if files are the same
-    # if not, update each file that needs updating. update metadata json file
-    # metadata includes: file name, year, hash, download timestamp
+    # use wget to grab zip files from ECMC
+    downloaded_files = {
+        year: wget.download(config.Config.production_summary_base_url + f + '.zip', out=zip_temp_path)
+        for year, f in filenames.items()
+    }
 
-    unzip_pulled_files(zip_path, access_db_path)
+    # hash zip files
+    file_sha256_hashes = hash_files(downloaded_files)
+
+    # build metadata for zip files
+    zip_metadata = {
+        file_sha256_hashes[year]: {
+            'path': filename,
+            'year': year,
+            'timestamp': datetime.datetime.now().isoformat(),
+        }
+        for year, filename in downloaded_files.items()
+    }
+
+    # write out zip metadata
+    with open(zip_temp_path + 'metadata.json', 'w') as f:
+        json.dump(zip_metadata, f)
+
+    # check if files are the same.
+    new_files = False
+    if pathlib.Path(zip_path + 'metadata.json').exists():
+        with open(zip_path + 'metadata.json', 'r') as f:
+            previous_zip_metadata = json.load(f)
+        for prev_sha256 in previous_zip_metadata:
+            if prev_sha256 not in zip_metadata:
+                new_files = True
+    else:
+        os.rename(zip_temp_path + 'metadata.json', zip_path + 'metadata.json')
+        for _, file_dict in zip_metadata.items():
+            os.rename(file_dict['path'], zip_path + file_dict['path'][file_dict['path'].rfind('\\'):])
+    
+    if new_files:
+        # if new files, remove old files and move new files to main zip directory
+        os.remove(zip_path + 'metadata.json')
+        os.rename(zip_temp_path + 'metadata.json', zip_path + 'metadata.json')
+        for _, file_dict in zip_metadata.items():
+            os.remove(zip_path + file_dict['path'][file_dict['path'].rfind('\\'):])
+            os.rename(file_dict['path'], zip_path + file_dict['path'][file_dict['path'].rfind('\\'):])
+
+        # backup any access db files
+        previous_access_db_files = list(pathlib.Path(access_db_path).glob('*.[mdb json]*'))
+        if len(previous_access_db_files) > 0:
+            previous_access_db_dir = access_db_previous_versions_path + datetime.datetime.now().strftime('%Y%m%d-%H%M%S') + '\\'
+            pathlib.Path(previous_access_db_dir).mkdir()
+            for f in previous_access_db_files:
+                os.rename(f, previous_access_db_dir + str(f)[str(f).rfind('\\'):])
+
+        # unzip new files
+        unzip_pulled_files(zip_path, access_db_path)
+
+        # make access db metadata
+        with open(access_db_path + 'metadata.json', 'w') as f:
+            json.dump({
+                metadata['year']: {
+                    'timestamp': metadata['timestamp'],
+                    'path': zip_path + metadata['path'][metadata['path'].rfind('\\') + 1:-3] + 'mdb',
+                }
+                for _, metadata in zip_metadata.items()
+            }, f)
 
 
-def get_filenames(filename_template: str, years: tuple[int]) -> dict[int, str]:
-    return {year: filename_template.replace('YYYY', str(year)) for year in years}
+def hash_files(files_dict: dict[int, str]) -> dict[int, str]:
+    file_hashes = {}
 
-
-def pull_from_ecmc(pull_dir: str, files: dict[int: str], base_url: str) -> dict[int, str]:
-    return {year: wget.download(base_url + f + '.zip', out=pull_dir) for year, f in files.items()}
+    for year, file_path in files_dict.items():
+        with open(file_path, 'rb') as f:
+            f_bytes = f.read()
+            file_hashes[year] = hashlib.sha256(f_bytes).hexdigest()
+    return file_hashes
 
 
 def unzip_pulled_files(pull_dir: str, db_dir: str) -> None:
