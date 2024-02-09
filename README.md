@@ -21,14 +21,14 @@ can be installed globally with `python -m pip install pyyaml polars spock-config
 
 If Python Poetry was installed, the recommended method for installing dependencies is to run
 
-``
+`python -m poetry install`
 
 from the root repository directory in Windows PowerShell
 
 ## Git
-Some of the Python package dependencies require Git. This is not available by default on Colorado State Windows Installations.
+Some of the Python package dependencies require Git. This is not available by default on Colorado State Windows Installations. One option to get access to Git on your machine is to request Git and/or GitHub Desktop, though I don't know yet if these installations will update the correct environment variable.
 
-There is a portable version of Git that can be downloaded [here](https://git-scm.com/download/win) and can be used without installation. Simply download the portable version, run the executable file to extract the contents, and choose a destination directory when prompted.
+Alternatively, there is a portable version of Git that can be downloaded [here](https://git-scm.com/download/win) and can be used without installation. Simply download the portable version, run the executable file to extract the contents, and choose a destination directory when prompted.
 
 `C:\Users\MyUserName\portable_git\` is a good option.
 
@@ -40,4 +40,23 @@ or using the recommended directory above:
 
 `$Env:GIT_PYTHON_GIT_EXECUTABLE = 'C:\Users\MyUserName\portable_git\bin\git.exe'`
 
-# 
+# Running the scripts
+For the remainder of the instructions, `$python` will refer to `python -m poetry run python` if dependencies were installed with Poetry or `python` if dependencies were installed globally.
+
+Default configurations for all scripts are available in the [[default_config]] directory. For each script, you can pass a configuration file with the `-c` command line option like this:
+
+`$python path/to/script.py -c path/to/config_file.yaml`
+
+Individual configuration options can also be modified as command line options. To see available command line options, use the command line option `--help`.
+
+## `load_from_xlsx.py`
+This script is deprecated and is only included for posterity.
+
+## `scrape_from_ecmc.py`
+#TODO
+
+## `convert_access_to_parquet.py`
+#TODO
+
+## `transform_ecmc.py`
+#TODO
