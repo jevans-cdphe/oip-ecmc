@@ -12,10 +12,11 @@ can be installed globally with `python -m pip install poetry` in Windows PowerSh
 This is not entirely necessary, but is recommended.
 
 ### Python packages:
+- arrow-odbc
 - PyYAML
 - pola.rs
-- Spock Config
 - requests
+- Spock Config
 
 can be installed globally with `python -m pip install pyyaml polars spock-config wget` in Windows PowerShell
 
