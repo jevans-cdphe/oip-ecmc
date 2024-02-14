@@ -15,7 +15,7 @@ This is not entirely necessary, but is recommended.
 - PyYAML
 - pola.rs
 - Spock Config
-- wget
+- requests
 
 can be installed globally with `python -m pip install pyyaml polars spock-config wget` in Windows PowerShell
 
@@ -34,18 +34,30 @@ Alternatively, there is a portable version of Git that can be downloaded [here](
 
 Once extracted, to tell Python where the Git executable is you will have to add an environment variable. This can easily be done on a per-shell basis without needing to run any scripts at login. To set the required environment variable for use in Windows PowerShell, run this command in PowerShell:
 
-`$Env:GIT_PYTHON_GIT_EXECUTABLE = 'C:\PortableGitDestinationDirectory\bin\git.exe'`
+`$Env:GIT_PYTHON_GIT_EXECUTABLE = 'C:\path\to\portable\git\bin\git.exe'`
 
 or using the recommended directory above:
 
-`$Env:GIT_PYTHON_GIT_EXECUTABLE = 'C:\Users\MyUserName\portable_git\bin\git.exe'`
+`$Env:GIT_PYTHON_GIT_EXECUTABLE = '%USERPROFILE%\portable_git\bin\git.exe'`
+
+Alternatively, you can set environment variables for git in the built-in Windows Environment Variables application. Under "User variables for MyUserName", add the following new evironment variable:
+
+Variable name: `GIT_PYTHON_GIT_EXECUTABLE`
+
+Variable value: `C:\path\to\portable\git\bin\git.exe`
+
+Optionally, also edit the `Path` variable to add the following lines:
+
+`C:\path\to\portable\git\bin`
+
+`C:\path\to\portable\git\cmd`
 
 # Running the scripts
 For the remainder of the instructions, `$python` will refer to `python -m poetry run python` if dependencies were installed with Poetry or `python` if dependencies were installed globally.
 
 Default configurations for all scripts are available in the [[default_config]] directory. For each script, you can pass a configuration file with the `-c` command line option like this:
 
-`$python path/to/script.py -c path/to/config_file.yaml`
+`$python path\to\script.py -c path\to\config_file.yaml`
 
 Individual configuration options can also be modified as command line options. To see available command line options, use the command line option `--help`.
 

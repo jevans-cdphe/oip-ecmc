@@ -1,11 +1,12 @@
 import datetime
 import json
+import logging
 import pathlib
 from typing import List
 import zipfile
 
+import requests
 import spock
-import wget
 
 import oip_ecmc.logger as lgr
 import oip_ecmc.utils as utils
@@ -72,6 +73,7 @@ def main() -> None:
         config.Config.production_summary_base_url,
         base_filenames,
         zip_temp_path,
+        logger,
     )
 
     zip_metadata = get_zip_metadata(downloaded_files, zip_path)
@@ -95,16 +97,25 @@ def download_files(
     base_url: str,
     filenames: list[str],
     out_dir: pathlib.Path,
-) -> dict[int, str]:
-    return {
-        year: pathlib.Path(
-            wget.download(
-                f'{base_url}/{f}.zip',
-                out=str(out_dir),
-            )
-        )
-        for year, f in filenames.items()
-    }
+    logger: logging.Logger,
+) -> dict[int, pathlib.Path]:
+    to_return = {}
+    for year, f in filenames.items():
+        try:
+            url = f'{base_url.strip("/")}/{f}.zip'.replace(" ", "%20")
+            response = requests.get(url)
+            response.raise_for_status()
+
+        except requests.exceptions.HTTPError as e:
+            logger.error(e)
+            raise SystemExit(e)
+
+        to_return[year] = out_dir / f'{f}.zip'
+        to_return[year].write_bytes(response.content)
+        logger.info(f'downloaded {url} to {to_return[year]}')
+
+    return to_return
+
 
 
 def get_zip_metadata(
