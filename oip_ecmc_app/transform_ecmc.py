@@ -131,7 +131,12 @@ def main() -> None:
                 logger,
             )
 
-        write_output_data(data, output_path, logger)
+        write_output_data(
+            data,
+            output_path,
+            config.Config.remove_CO2_wells,
+            logger,
+        )
 
 
 def get_output_metadata(
@@ -157,9 +162,12 @@ def write_output_data(
 ) -> None:
     for year, df in data['production'].items():
         df_out = df.join(
-            data['completions'][max(data['completions'])], on='API_num')
+            data['completions'][max(data['completions'])],
+            on='API_num',
+            how='outer',
+        ).select(pl.exclude('^.*_right$'))
         if remove_co2_wells:
-            df_out = df_out.filter(pl.col('Prod_days') == 0)
+            df_out = df_out.filter(pl.col('Prod_days') != 0)
         df_out.write_csv(output_path / f'{year}.csv')
 
 
