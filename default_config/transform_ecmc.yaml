@@ -4,6 +4,7 @@ parquet_directory: ECMC parquet
 log_directory: logs
 output_type: csv
 output_directory: ECMC transformed data
+remove_CO2_wells: true
 production_columns_to_keep:
   - name
   - operator_num

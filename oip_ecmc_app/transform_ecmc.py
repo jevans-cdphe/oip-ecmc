@@ -36,6 +36,7 @@ class Config:
     output_directory: str = 'ECMC transformed data'
     log_directory: str = 'logs'
     output_type: OutputType = OutputType.csv
+    remove_CO2_wells: bool = True
     production_columns_to_keep: List[str] = [
         'name',
         'operator_num',
@@ -151,17 +152,15 @@ def get_output_metadata(
 def write_output_data(
     data: dict[int, pl.DataFrame],
     output_path: pathlib.Path,
+    remove_co2_wells: bool,
     logger: logging.Logger,
 ) -> None:
     for year, df in data['production'].items():
-        (
-            df
-            .join(
-                data['completions'][max(data['completions'])],
-                on='API_num',
-            )
-            .write_csv(output_path / f'{year}.csv')
-        )
+        df_out = df.join(
+            data['completions'][max(data['completions'])], on='API_num')
+        if remove_co2_wells:
+            df_out = df_out.filter(pl.col('Prod_days') == 0)
+        df_out.write_csv(output_path / f'{year}.csv')
 
 
 def transform_production(
