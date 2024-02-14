@@ -18,7 +18,7 @@ This is not entirely necessary, but is recommended.
 - requests
 - Spock Config
 
-can be installed globally with `python -m pip install pyyaml polars spock-config wget` in Windows PowerShell
+can be installed globally with `python -m pip install pyyaml polars requests spock-config` in Windows PowerShell
 
 If Python Poetry was installed, the recommended method for installing dependencies is to run
 
