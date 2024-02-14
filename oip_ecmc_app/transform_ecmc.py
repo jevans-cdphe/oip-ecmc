@@ -1,4 +1,5 @@
 import json
+import logging
 import pathlib
 from typing import List
 
@@ -100,37 +101,43 @@ def main() -> None:
     with (parquet_dir / 'metadata.json').open('r') as f:
         parquet_metadata = json.load(f)
 
-    data = {'production': {}, 'completions': {}}
-    for _, hash_dict in parquet_metadata.items():
-        data['production'][hash_dict['year']] = transform_production(
-            pathlib.Path(hash_dict['production_path']),
-            config.Config.production_columns_to_keep,
-            config.Config.production_columns_to_fill_null_with_zero,
-        )
-        data['completions'][hash_dict['year']] = transform_completions(
-            pathlib.Path(hash_dict['completions_path']),
-            config.Config.completions_columns_to_keep,
-            config.Config.completions_columns_to_fill_null_with_zero,
-        )
-
     output_path = ecmc_data_path / config.Config.output_directory
     output_previous_versions_path = output_path / 'previous_versions'
     output_previous_versions_path.mkdir(parents=True, exist_ok=True)
         
-    output_metadata = get_output_metadata(parquet_metadata, output_path)
+    output_metadata = get_output_metadata(parquet_metadata, output_path, logger)
     output_metadata_path = output_path / 'metadata.json'
 
-    if utils.new_hashes(output_metadata, output_metadata_path):
-        utils.backup(output_path, output_previous_versions_path, 'csv')
+    if utils.new_hashes(output_metadata, output_metadata_path, logger=logger):
+        utils.backup(
+            output_path, output_previous_versions_path, 'csv', logger=logger)
 
         with output_metadata_path.open('w') as f:
-            json.dump(utils.to_json(output_metadata), f)
+            json.dump(utils.to_json(output_metadata, logger=logger), f)
 
-        write_output_data(data, output_path)
+        data = {'production': {}, 'completions': {}}
+        for _, hash_dict in parquet_metadata.items():
+            data['production'][hash_dict['year']] = transform_production(
+                pathlib.Path(hash_dict['production_path']),
+                config.Config.production_columns_to_keep,
+                config.Config.production_columns_to_fill_null_with_zero,
+                logger,
+            )
+            data['completions'][hash_dict['year']] = transform_completions(
+                pathlib.Path(hash_dict['completions_path']),
+                config.Config.completions_columns_to_keep,
+                config.Config.completions_columns_to_fill_null_with_zero,
+                logger,
+            )
+
+        write_output_data(data, output_path, logger)
 
 
 def get_output_metadata(
-        parquet_metadata: dict, output_path: pathlib.Path) -> dict:
+    parquet_metadata: dict,
+    output_path: pathlib.Path,
+    logger: logging.Logger,
+) -> dict:
     return {
         sha_hash: {
             'year': hash_dict['year'],
@@ -142,7 +149,10 @@ def get_output_metadata(
 
 
 def write_output_data(
-        data: dict[int, pl.DataFrame], output_path: pathlib.Path) -> None:
+    data: dict[int, pl.DataFrame],
+    output_path: pathlib.Path,
+    logger: logging.Logger,
+) -> None:
     for year, df in data['production'].items():
         (
             df
@@ -158,6 +168,7 @@ def transform_production(
     parquet_path: pathlib.Path,
     production_keep: list[str],
     production_fillnull: list[str],
+    logger: logging.Logger,
 ) -> pl.DataFrame:
     return (
         pl.scan_parquet(parquet_path)
@@ -236,6 +247,7 @@ def transform_completions(
     parquet_path: pathlib.Path,
     completions_keep: list[str],
     completions_fillnull: list[str],
+    logger: logging.Logger,
 ) -> pl.DataFrame:
     return (
         pl.scan_parquet(parquet_path)

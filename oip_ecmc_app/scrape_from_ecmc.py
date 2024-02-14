@@ -67,7 +67,7 @@ def main() -> None:
     access_db_previous_versions_path = access_db_path / 'previous_versions'
     access_db_previous_versions_path.mkdir(parents=True, exist_ok=True)
 
-    utils.remove_files(zip_temp_path, ['zip', 'json'])
+    utils.remove_files(zip_temp_path, ['zip', 'json'], logger=logger)
 
     downloaded_files = download_files(
         config.Config.production_summary_base_url,
@@ -76,21 +76,32 @@ def main() -> None:
         logger,
     )
 
-    zip_metadata = get_zip_metadata(downloaded_files, zip_path)
+    zip_metadata = get_zip_metadata(downloaded_files, zip_path, logger)
 
     with (zip_temp_path / 'metadata.json').open('w') as f:
-        json.dump(utils.to_json(zip_metadata), f)
+        json.dump(utils.to_json(zip_metadata, logger=logger), f)
 
-    if utils.new_hashes(zip_metadata, zip_path / 'metadata.json'):
-        utils.remove_files(zip_path, ['zip', 'json'])
-        utils.move_files(zip_temp_path, zip_path, ['zip', 'json'])
+    if utils.new_hashes(zip_metadata, zip_path / 'metadata.json', logger=logger):
+        utils.remove_files(zip_path, ['zip', 'json'], logger=logger)
+        utils.move_files(
+            zip_temp_path, zip_path, ['zip', 'json'], logger=logger)
 
-        utils.backup(access_db_path, access_db_previous_versions_path, 'mdb')
-        unzip_pulled_files(zip_path, access_db_path)
+        utils.backup(
+            access_db_path,
+            access_db_previous_versions_path,
+            'mdb',
+            logger=logger,
+        )
+
+        unzip_pulled_files(zip_path, access_db_path, logger)
 
         with (access_db_path / 'metadata.json').open('w') as f:
             json.dump(
-                utils.to_json(get_db_metadata(access_db_path, zip_metadata)), f)
+                utils.to_json(
+                    get_db_metadata(access_db_path, zip_metadata, logger)),
+                f,
+                logger=logger,
+            )
 
 
 def download_files(
@@ -117,13 +128,13 @@ def download_files(
     return to_return
 
 
-
 def get_zip_metadata(
     downloaded_files: dict[int, str],
     zip_dir:pathlib.Path,
+    logger: logging.Logger,
 ) -> dict[str, dict]:
     return {
-        utils.hash_file(f): {
+        utils.hash_file(f, logger=logger): {
             'path': zip_dir / f.name,
             'year': year,
             'timestamp': datetime.datetime.now().isoformat(),
@@ -135,11 +146,12 @@ def get_zip_metadata(
 def get_db_metadata(
     access_db_path: pathlib.Path,
     zip_metadata: dict[str, dict],
+    logger: logging.Logger,
 ) -> dict[int, dict]:
     to_return = {}
     for _, metadata in zip_metadata.items():
         f = access_db_path / f'{metadata["path"].stem}.mdb'
-        to_return[utils.hash_file(f)] = {
+        to_return[utils.hash_file(f, logger=logger)] = {
             'year': metadata['year'],
             'timestamp': metadata['timestamp'],
             'path': f,
@@ -147,7 +159,11 @@ def get_db_metadata(
     return to_return
 
 
-def unzip_pulled_files(pull_dir: pathlib.Path, db_dir: pathlib.Path) -> None:
+def unzip_pulled_files(
+    pull_dir: pathlib.Path,
+    db_dir: pathlib.Path,
+    logger: logging.Logger,
+) -> None:
     zip_files = [f for f in pull_dir.iterdir() if f.suffix == '.zip']
 
     for f in zip_files:

@@ -89,27 +89,31 @@ def main() -> None:
     with (access_db_path / 'metadata.json').open('r') as f:
         access_db_metadata = json.load(f)
 
-    parquet_metadata = get_parquet_metadata(access_db_metadata, parquet_path)
+    parquet_metadata = get_parquet_metadata(
+        access_db_metadata, parquet_path, logger)
     parquet_metadata_path = parquet_path / 'metadata.json'
 
-    if utils.new_hashes(parquet_metadata, parquet_metadata_path):
+    if utils.new_hashes(parquet_metadata, parquet_metadata_path, logger=logger):
         utils.backup(
             parquet_path,
             parquet_previous_versions_path,
             'parquet',
             path_keys=['production_path', 'completions_path'],
             keys_to_delete=['db_path'],
+            logger=logger,
         )
 
         with parquet_metadata_path.open('w') as f:
-            json.dump(utils.to_json(parquet_metadata), f)
+            json.dump(utils.to_json(parquet_metadata, logger=logger), f)
 
-        driver = get_access_driver(config.Config.microsoft_access_driver)
+        driver = get_access_driver(
+            config.Config.microsoft_access_driver, logger)
         data = mdb_import(access_db_metadata, logger, driver=driver)
-        write_parquet(parquet_path, data)
+        write_parquet(parquet_path, data, logger)
 
 
-def odbc_connection_str(connection: dict[ODBCKey, str]) -> str:
+def odbc_connection_str(
+        connection: dict[ODBCKey, str], logger: logging.Logger) -> str:
     return ''.join([k + '=' + v + ';' for k, v in connection.items()])
 
 
@@ -126,6 +130,7 @@ def read_odbc_table(
 def get_parquet_metadata(
     db_metadata: dict[str, dict],
     parquet_path: pathlib.Path,
+    logger: logging.Logger,
 ) -> dict[str, dict]:
     
     return {
@@ -166,6 +171,7 @@ def mdb_import(
 def write_parquet(
     out_dir: pathlib.Path,
     data: dict[MsAccessTable, dict[int, pl.DataFrame]],
+    logger: logging.Logger,
 ) -> None:
     for table, year_dfs in data.items():
         for year, df in year_dfs.items():
