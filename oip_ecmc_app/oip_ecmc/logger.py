@@ -3,12 +3,13 @@ import datetime as dt
 import json
 import logging.config
 import logging.handlers
-import os
 import pathlib
 import queue
 from typing import Optional, Union
 
 import yaml
+
+from . import utils
 
 
 LOG_RECORD_BUILTIN_ATTRS = {
@@ -38,20 +39,34 @@ LOG_RECORD_BUILTIN_ATTRS = {
 }
 
 
-def get_logger(logger_name: str, log_level: str, log_file: str) -> logging.Logger:
-    logger = logging.getLogger(logger_name)
+class LogLevel(utils.StrEnum):
+    '''
+    Level of detail of logging. DEBUG is the most verbose, and CRITICAL is the
+    least.
+    '''
+    DEBUG = 'DEBUG'
+    INFO = 'INFO'
+    WARNING = 'WARNING'
+    ERROR = 'ERROR'
+    CRITICAL = 'CRITICAL'
 
-    logger_py_path = os.path.abspath(__file__)
-    logger_dir = logger_py_path[:logger_py_path.rfind('\\') + 1]
-    config_file = pathlib.Path(logger_dir + 'log_config.yaml')
-    print(config_file)
-    with open(config_file) as f_in:
+
+def get_logger(
+    logger_name: str,
+    log_level: str,
+    log_path: pathlib.Path,
+) -> logging.Logger:
+    log_path.mkdir(parents=True, exist_ok=True)
+    logger = logging.getLogger(logger_name)
+    config_file = pathlib.Path(__file__).absolute().parent / 'log_config.yaml'
+
+    with config_file.open() as f_in:
         config = yaml.load(f_in, Loader=yaml.Loader)
 
-    config['handlers']['file_json']['filename'] = log_file
+    config['handlers']['file_json']['filename'] = log_path / f'{logger_name}.jsonl'
     logging.config.dictConfig(config)
     logging.basicConfig(level=log_level)
-
+    
     return logger
 
 

@@ -10,11 +10,15 @@ import oip_ecmc.utils as utils
 
 
 DESCRIPTION = '''
-This script accepts Microsoft Access Database files pulled from the Colorado ECMC website using the included scrape_from_ecmc.py script.
+This script accepts Microsoft Access Database files pulled from the Colorado
+ECMC website using the included scrape_from_ecmc.py script.
 
-This will take those Access files and convert them into parquet files for better compatibility with automated tools such as the included transform_ecmc.py script.
+This will take those Access files and convert them into parquet files for better
+compatibility with automated tools such as the included transform_ecmc.py
+script.
 
-Because this script relies on the Microsoft Access driver, it only runs on Microsoft Windows operating systems.
+Because this script relies on the Microsoft Access driver, it only runs on
+Microsoft Windows operating systems.
 '''
 
 
@@ -58,7 +62,7 @@ class ODBCKey(utils.StrEnum):
 
 @spock.spock
 class Config:
-    log_level: utils.LogLevel = utils.LogLevel.INFO
+    log_level: lgr.LogLevel = lgr.LogLevel.INFO
     ecmc_data_path: str = '~/Documents/ecmc/'
     access_db_directory: str = 'ECMC db'
     parquet_directory: str = 'ECMC parquet'
@@ -69,31 +73,40 @@ class Config:
 def main() -> None:
     config = spock.SpockBuilder(Config, desc=DESCRIPTION).generate()
 
-    log_path = utils.get_dir_path(config.Config.ecmc_data_path, config.Config.log_directory)
+    ecmc_data_path = utils.str_to_path(config.Config.ecmc_data_path)
+
     logger = lgr.get_logger(
-        'convert_access_to_parquet', config.Config.log_level, log_path + 'convert_access_to_parquet.jsonl')
+        'convert_access_to_parquet',
+        config.Config.log_level,
+        ecmc_data_path / config.Config.log_directory,
+    )
 
-    access_db_path = utils.get_dir_path(config.Config.ecmc_data_path, config.Config.access_db_directory)
+    access_db_path = ecmc_data_path / config.Config.access_db_directory
+    parquet_path = ecmc_data_path / config.Config.parquet_directory
+    parquet_previous_versions_path = parquet_path / 'previous_versions'
+    parquet_previous_versions_path.mkdir(parents=True, exist_ok=True)
 
-    parquet_path = utils.get_dir_path(config.Config.ecmc_data_path, config.Config.parquet_directory)
-    parquet_previous_versions_path = parquet_path + 'previous_versions\\'
-    pathlib.Path(parquet_previous_versions_path).mkdir(parents=True, exist_ok=True)
+    with (access_db_path / 'metadata.json').open('r') as f:
+        access_db_metadata = json.load(f)
 
-    # check if files are the same
-    # if not, update each file that needs updating. update metadata json file
-    # metadata includes: file name, year, hash, download timestamp
+    parquet_metadata = get_parquet_metadata(access_db_metadata, parquet_path)
+    parquet_metadata_path = parquet_path / 'metadata.json'
 
-    access_db_metadata = json.load(access_db_path + 'metadata.json')
-    filenames = get_filenames(access_db_metadata)
-    driver = get_access_driver(config.Config.microsoft_access_driver)
-    data = mdb_import(
-        access_db_path, filenames, logger, driver=driver)
-    write_parquet(parquet_path, data)
+    if utils.new_hashes(parquet_metadata, parquet_metadata_path):
+        utils.backup(
+            parquet_path,
+            parquet_previous_versions_path,
+            'parquet',
+            path_keys=['production_path', 'completions_path'],
+            keys_to_delete=['db_path'],
+        )
 
+        with parquet_metadata_path.open('w') as f:
+            json.dump(utils.to_json(parquet_metadata), f)
 
-def get_filenames(metadata: dict) -> dict[int, str]:
-    '''
-    '''
+        driver = get_access_driver(config.Config.microsoft_access_driver)
+        data = mdb_import(access_db_metadata, logger, driver=driver)
+        write_parquet(parquet_path, data)
 
 
 def odbc_connection_str(connection: dict[ODBCKey, str]) -> str:
@@ -101,15 +114,36 @@ def odbc_connection_str(connection: dict[ODBCKey, str]) -> str:
 
 
 def read_odbc_table(
-        table: MsAccessTable, connection: dict[ODBCKey, str], logger: logging.Logger) -> pl.DataFrame:
+    table: MsAccessTable,
+    connection: dict[ODBCKey, str],
+    logger: logging.Logger,
+) -> pl.DataFrame:
     logger.info(f'loading data from {table} in {connection[ODBCKey.dbq]}')
     query = f'SELECT * FROM \"{table}\"'
     return pl.read_database(query, connection=odbc_connection_str(connection))
 
 
+def get_parquet_metadata(
+    db_metadata: dict[str, dict],
+    parquet_path: pathlib.Path,
+) -> dict[str, dict]:
+    
+    return {
+        sha_hash: {
+            'year': hash_dict['year'],
+            'db_path': pathlib.Path(hash_dict['path']),
+            'production_path': parquet_path \
+                / f'{MsAccessTable.production}_{hash_dict["year"]}.parquet',
+            'completions_path': parquet_path \
+                / f'{MsAccessTable.completions}_{hash_dict["year"]}.parquet',
+            'timestamp': hash_dict['timestamp']
+        }
+        for sha_hash, hash_dict in db_metadata.items()
+    }
+
+
 def mdb_import(
-    db_dir: str,
-    files: dict[int, str],
+    metadata: dict[int, str],
     logger: logging.Logger,
     driver: MsAccessDriver = MsAccessDriver.x64,
     tables: list[MsAccessTable] = [
@@ -120,20 +154,22 @@ def mdb_import(
     db_data = {table: {} for table in tables}
     connection = {ODBCKey.driver: driver, ODBCKey.dbq: ''}
 
-    for year, f in files.items():
-        connection[ODBCKey.dbq] = db_dir + f + '.mdb'
+    for _, hash_dict in metadata.items():
+        connection[ODBCKey.dbq] = hash_dict['path']
         for table in db_data:
-            db_data[table][year] = read_odbc_table(table, connection, logger)
+            db_data[table][hash_dict['year']] = read_odbc_table(
+                table, connection, logger)
 
     return db_data
 
 
 def write_parquet(
-        out_dir: str, data: dict[MsAccessTable, dict[int, pl.DataFrame]]) -> None:
+    out_dir: pathlib.Path,
+    data: dict[MsAccessTable, dict[int, pl.DataFrame]],
+) -> None:
     for table, year_dfs in data.items():
         for year, df in year_dfs.items():
-            filename = f'{table}_{year}.parquet'
-            df.write_parquet(f'{out_dir}\\{filename}')
+            df.write_parquet(out_dir / f'{table}_{year}.parquet')
 
 
 if __name__ == '__main__':

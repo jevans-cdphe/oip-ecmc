@@ -3,6 +3,7 @@ ecmc_data_path: ~/Documents/ecmc/
 parquet_directory: ECMC parquet
 log_directory: logs
 output_type: csv
+output_directory: ECMC transformed data
 production_columns_to_keep:
   - name
   - operator_num
