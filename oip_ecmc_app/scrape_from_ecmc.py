@@ -100,7 +100,6 @@ def main() -> None:
                 utils.to_json(
                     get_db_metadata(access_db_path, zip_metadata, logger)),
                 f,
-                logger=logger,
             )
 
 

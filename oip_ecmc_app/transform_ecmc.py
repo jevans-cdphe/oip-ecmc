@@ -55,8 +55,6 @@ class Config:
         'water_prod',
     ]
     completions_columns_to_keep: List[str] = [
-        'name',
-        'operator_num',
         'facility_name',
         'facility_num',
         'well_name',
@@ -165,7 +163,7 @@ def write_output_data(
             data['completions'][max(data['completions'])],
             on='API_num',
             how='outer',
-        ).select(pl.exclude('^.*_right$'))
+        )
         if remove_co2_wells:
             df_out = df_out.filter(pl.col('Prod_days') != 0)
         df_out.write_csv(output_path / f'{year}.csv')

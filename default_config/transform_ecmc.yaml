@@ -22,8 +22,6 @@ production_columns_to_keep:
   - oil_prod
   - water_prod
 completions_columns_to_keep:
-  - name
-  - operator_num
   - facility_name
   - facility_num
   - well_name

@@ -106,8 +106,7 @@ def main() -> None:
         with parquet_metadata_path.open('w') as f:
             json.dump(utils.to_json(parquet_metadata, logger=logger), f)
 
-        driver = get_access_driver(
-            config.Config.microsoft_access_driver, logger)
+        driver = get_access_driver(config.Config.microsoft_access_driver)
         data = mdb_import(access_db_metadata, logger, driver=driver)
         write_parquet(parquet_path, data, logger)
 
@@ -124,7 +123,8 @@ def read_odbc_table(
 ) -> pl.DataFrame:
     logger.info(f'loading data from {table} in {connection[ODBCKey.dbq]}')
     query = f'SELECT * FROM \"{table}\"'
-    return pl.read_database(query, connection=odbc_connection_str(connection))
+    return pl.read_database(
+        query, connection=odbc_connection_str(connection, logger))
 
 
 def get_parquet_metadata(
