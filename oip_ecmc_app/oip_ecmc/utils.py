@@ -111,27 +111,19 @@ def backup(
 
 def to_json(
         non_json_dict: dict, logger: Optional[logging.Logger] = None) -> dict:
-    json_dict = {}
-    for k, v in non_json_dict.items():
-        if isinstance(v, dict):
-            json_dict[k] = to_json(v)
-        elif isinstance(v, list):
-            json_dict[k] = _to_json_list(v)
-        else:
-            json_dict[k] = _to_json_item(v)
-    return json_dict
+    return {k: _to_json(v) for k, v in non_json_dict.items()}
+
+
+def _to_json(non_json):
+    if isinstance(non_json, dict):
+        return to_json(non_json)
+    elif isinstance(non_json, list):
+        return _to_json_list(non_json)
+    return _to_json_item(non_json)
 
 
 def _to_json_list(non_json_list: list) -> list:
-    json_list = []
-    for i in non_json_list:
-        if isinstance(i, dict):
-            json_list.append(to_json(i))
-        elif isinstance(i, list):
-            json_list.append(_to_json_list(i))
-        else:
-            json_list.append(_to_json_item(i))
-    return json_list
+    return [_to_json(i) for i in non_json_list]
 
 
 def _to_json_item(non_json_item):
