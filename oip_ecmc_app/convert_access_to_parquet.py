@@ -6,7 +6,6 @@ import polars as pl
 from spock.backend.wrappers import Spockspace
 
 import oip_ecmc.config as cfg
-import oip_ecmc.logger as lgr
 import oip_ecmc.setup as setup
 import oip_ecmc.utils as utils
 
