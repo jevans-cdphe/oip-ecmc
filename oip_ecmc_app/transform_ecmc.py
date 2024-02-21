@@ -1,13 +1,12 @@
 import json
 import logging
 import pathlib
-from typing import List
 
 import polars as pl
-import spock
 
 import oip_ecmc.logger as lgr
 import oip_ecmc.utils as utils
+import oip_ecmc.config as cfg
 
 
 DESCRIPTION = '''
@@ -17,90 +16,23 @@ that Ben Hmiel used at the start of this project.
 '''
 
 
-class OutputType(utils.StrEnum):
-    '''
-    Currently only csv is supported
-    '''
-    csv = 'csv'
-    # ipc = 'ipc'
-    # parquet = 'parquet'
-    # avro = 'avro'
-    # excel = 'excel'
-
-
-@spock.spock
-class Config:
-    log_level: lgr.LogLevel = lgr.LogLevel.INFO
-    ecmc_data_path: str = '~/Documents/ecmc/'
-    parquet_directory: str = 'ECMC parquet'
-    output_directory: str = 'ECMC transformed data'
-    log_directory: str = 'logs'
-    output_type: OutputType = OutputType.csv
-    remove_CO2_wells: bool = True
-    production_columns_to_keep: List[str] = [
-        'name',
-        'operator_num',
-        'API_num',
-        'Prod_days',
-        'gas_btu_sales',
-        'gas_sales',
-        'gas_shrinkage',
-        'gas_used_on_lease',
-        'flared_vented',
-        'oil_adjustment',
-        'oil_gravity',
-        'oil_sales',
-        'gas_prod',
-        'oil_prod',
-        'water_prod',
-    ]
-    completions_columns_to_keep: List[str] = [
-        'facility_name',
-        'facility_num',
-        'well_name',
-        'API_num',
-        'well_bore_status',
-        'county',
-        'lat',
-        'long',
-        'first_prod_date',
-        'gas_type',
-    ]
-    production_columns_to_fill_null_with_zero: List[str] = [
-        'gas_btu_sales',
-        'gas_sales',
-        'gas_shrinkage',
-        'gas_used_on_lease',
-        'flared_vented',
-        'oil_adjustment',
-        'oil_gravity',
-        'oil_sales',
-        'gas_prod',
-        'oil_prod',
-        'water_prod',
-    ]
-    completions_columns_to_fill_null_with_zero: List[str] = [
-        'gas_type',
-    ]
-
-
 def main() -> None:
-    config = spock.SpockBuilder(Config, desc=DESCRIPTION).generate()
+    config = cfg.get_individual_config(cfg.TransformConfig, DESCRIPTION)
 
-    ecmc_data_path = utils.str_to_path(config.Config.ecmc_data_path)
+    ecmc_data_path = utils.str_to_path(config.ECMCConfig.ecmc_data_path)
 
     logger = lgr.get_logger(
         'transform_ecmc',
-        config.Config.log_level,
-        ecmc_data_path / config.Config.log_directory,
+        config.ECMCConfig.log_level,
+        ecmc_data_path / config.ECMCConfig.log_directory,
     )
 
-    parquet_dir = ecmc_data_path / config.Config.parquet_directory
+    parquet_dir = ecmc_data_path / config.TransformConfig.parquet_directory
 
     with (parquet_dir / 'metadata.json').open('r') as f:
         parquet_metadata = json.load(f)
 
-    output_path = ecmc_data_path / config.Config.output_directory
+    output_path = ecmc_data_path / config.TransformConfig.output_directory
     output_previous_versions_path = output_path / 'previous_versions'
     output_previous_versions_path.mkdir(parents=True, exist_ok=True)
         
@@ -118,21 +50,21 @@ def main() -> None:
         for _, hash_dict in parquet_metadata.items():
             data['production'][hash_dict['year']] = transform_production(
                 pathlib.Path(hash_dict['production_path']),
-                config.Config.production_columns_to_keep,
-                config.Config.production_columns_to_fill_null_with_zero,
+                config.TransformConfig.production_columns_to_keep,
+                config.TransformConfig.production_columns_to_fill_null_with_zero,
                 logger,
             )
             data['completions'][hash_dict['year']] = transform_completions(
                 pathlib.Path(hash_dict['completions_path']),
-                config.Config.completions_columns_to_keep,
-                config.Config.completions_columns_to_fill_null_with_zero,
+                config.TransformConfig.completions_columns_to_keep,
+                config.TransformConfig.completions_columns_to_fill_null_with_zero,
                 logger,
             )
 
         write_output_data(
             data,
             output_path,
-            config.Config.remove_CO2_wells,
+            config.TransformConfig.remove_CO2_wells,
             logger,
         )
 

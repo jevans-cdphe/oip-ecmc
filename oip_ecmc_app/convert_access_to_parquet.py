@@ -3,8 +3,8 @@ import logging
 import pathlib
 
 import polars as pl
-import spock
 
+import oip_ecmc.config as cfg
 import oip_ecmc.logger as lgr
 import oip_ecmc.utils as utils
 
@@ -27,16 +27,8 @@ class _MsAccessDriver(utils.StrEnum):
     x32 = r'{Microsoft Access Driver (*.mdb)}'
 
 
-class MsAccessDriver(utils.StrEnum):
-    '''
-    Most modern Windows installations will have/use the x64 driver.
-    '''
-    x64 = 'x64'
-    x32 = 'x32'
-
-
-def get_access_driver(access_driver: MsAccessDriver) -> _MsAccessDriver:
-    if access_driver == MsAccessDriver.x32:
+def get_access_driver(access_driver: cfg.MsAccessDriver) -> _MsAccessDriver:
+    if access_driver == cfg.MsAccessDriver.x32:
         return _MsAccessDriver.x32
     return _MsAccessDriver.x64
 
@@ -60,29 +52,19 @@ class ODBCKey(utils.StrEnum):
     user_commit_sync = 'USERCOMMITSYNC'
 
 
-@spock.spock
-class Config:
-    log_level: lgr.LogLevel = lgr.LogLevel.INFO
-    ecmc_data_path: str = '~/Documents/ecmc/'
-    access_db_directory: str = 'ECMC db'
-    parquet_directory: str = 'ECMC parquet'
-    log_directory: str = 'logs'
-    microsoft_access_driver: MsAccessDriver = MsAccessDriver.x64
-
-
 def main() -> None:
-    config = spock.SpockBuilder(Config, desc=DESCRIPTION).generate()
+    config = cfg.get_individial_config(cfg.ConvertDBConfig, DESCRIPTION)
 
-    ecmc_data_path = utils.str_to_path(config.Config.ecmc_data_path)
+    ecmc_data_path = utils.str_to_path(config.ECMCConfig.ecmc_data_path)
 
     logger = lgr.get_logger(
         'convert_access_to_parquet',
-        config.Config.log_level,
-        ecmc_data_path / config.Config.log_directory,
+        config.ECMCConfig.log_level,
+        ecmc_data_path / config.ECMCConfig.log_directory,
     )
 
-    access_db_path = ecmc_data_path / config.Config.access_db_directory
-    parquet_path = ecmc_data_path / config.Config.parquet_directory
+    access_db_path = ecmc_data_path / config.ConvertDBConfig.access_db_directory
+    parquet_path = ecmc_data_path / config.ConvertDBConfig.parquet_directory
     parquet_previous_versions_path = parquet_path / 'previous_versions'
     parquet_previous_versions_path.mkdir(parents=True, exist_ok=True)
 
@@ -106,7 +88,7 @@ def main() -> None:
         with parquet_metadata_path.open('w') as f:
             json.dump(utils.to_json(parquet_metadata, logger=logger), f)
 
-        driver = get_access_driver(config.Config.microsoft_access_driver)
+        driver = get_access_driver(config.ConvertDBConfig.microsoft_access_driver)
         data = mdb_import(access_db_metadata, logger, driver=driver)
         write_parquet(parquet_path, data, logger)
 
@@ -150,7 +132,7 @@ def get_parquet_metadata(
 def mdb_import(
     metadata: dict[int, str],
     logger: logging.Logger,
-    driver: MsAccessDriver = MsAccessDriver.x64,
+    driver: _MsAccessDriver = _MsAccessDriver.x64,
     tables: list[MsAccessTable] = [
         MsAccessTable.production,
         MsAccessTable.completions,
