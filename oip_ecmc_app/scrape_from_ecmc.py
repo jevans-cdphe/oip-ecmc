@@ -5,9 +5,11 @@ import pathlib
 import zipfile
 
 import requests
+from spock.backend.wrappers import Spockspace
 
 import oip_ecmc.config as cfg
 import oip_ecmc.logger as lgr
+import oip_ecmc.setup as setup
 import oip_ecmc.utils as utils
 
 
@@ -21,33 +23,37 @@ each Production Summary file.
 
 
 def main() -> None:
-    config = cfg.get_individial_config(cfg.ScrapeConfig, DESCRIPTION)
-
-    ecmc_data_path = utils.str_to_path(config.ECMCConfig.ecmc_data_path)
-
-    logger = lgr.get_logger(
+    config, ecmc_data_path, logger = setup.setup_individual_script(
+        cfg.ScrapeConfig,
+        DESCRIPTION,
         'scrape_from_ecmc',
-        config.ECMCConfig.log_level,
-        ecmc_data_path / config.ECMCConfig.log_directory,
     )
 
+    scrape_from_ecmc(config.ScrapeConfig, ecmc_data_path, logger)
+
+
+def scrape_from_ecmc(
+    config: Spockspace,
+    ecmc_data_path: pathlib.Path,
+    logger: logging.Logger,
+) -> None:
     base_filenames = {
-        year: config.ScrapeConfig.filename_template.replace('YYYY', str(year))
-        for year in config.ScrapeConfig.years
+        year: config.filename_template.replace('YYYY', str(year))
+        for year in config.years
     }
 
-    zip_path = ecmc_data_path / config.ScrapeConfig.zip_directory
+    zip_path = ecmc_data_path / config.zip_directory
     zip_temp_path = zip_path / 'temp'
     zip_temp_path.mkdir(parents=True, exist_ok=True)
 
-    access_db_path = ecmc_data_path / config.ScrapeConfig.access_db_directory
+    access_db_path = ecmc_data_path / config.access_db_directory
     access_db_previous_versions_path = access_db_path / 'previous_versions'
     access_db_previous_versions_path.mkdir(parents=True, exist_ok=True)
 
     utils.remove_files(zip_temp_path, ['zip', 'json'], logger=logger)
 
     downloaded_files = download_files(
-        config.ScrapeConfig.production_summary_base_url,
+        config.production_summary_base_url,
         base_filenames,
         zip_temp_path,
         logger,

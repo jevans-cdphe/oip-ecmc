@@ -3,10 +3,12 @@ import logging
 import pathlib
 
 import polars as pl
+from spock.backend.wrappers import Spockspace
 
-import oip_ecmc.logger as lgr
-import oip_ecmc.utils as utils
 import oip_ecmc.config as cfg
+import oip_ecmc.logger as lgr
+import oip_ecmc.setup as setup
+import oip_ecmc.utils as utils
 
 
 DESCRIPTION = '''
@@ -17,22 +19,26 @@ that Ben Hmiel used at the start of this project.
 
 
 def main() -> None:
-    config = cfg.get_individual_config(cfg.TransformConfig, DESCRIPTION)
-
-    ecmc_data_path = utils.str_to_path(config.ECMCConfig.ecmc_data_path)
-
-    logger = lgr.get_logger(
+    config, ecmc_data_path, logger = setup.setup_individual_script(
+        cfg.TransformConfig,
+        DESCRIPTION,
         'transform_ecmc',
-        config.ECMCConfig.log_level,
-        ecmc_data_path / config.ECMCConfig.log_directory,
     )
 
-    parquet_dir = ecmc_data_path / config.TransformConfig.parquet_directory
+    transform_ecmc(config.TransformConfig, ecmc_data_path, logger)
+
+
+def transform_ecmc(
+    config: Spockspace,
+    ecmc_data_path: pathlib.Path,
+    logger: logging.Logger,
+) -> None:
+    parquet_dir = ecmc_data_path / config.parquet_directory
 
     with (parquet_dir / 'metadata.json').open('r') as f:
         parquet_metadata = json.load(f)
 
-    output_path = ecmc_data_path / config.TransformConfig.output_directory
+    output_path = ecmc_data_path / config.output_directory
     output_previous_versions_path = output_path / 'previous_versions'
     output_previous_versions_path.mkdir(parents=True, exist_ok=True)
         
@@ -50,21 +56,21 @@ def main() -> None:
         for _, hash_dict in parquet_metadata.items():
             data['production'][hash_dict['year']] = transform_production(
                 pathlib.Path(hash_dict['production_path']),
-                config.TransformConfig.production_columns_to_keep,
-                config.TransformConfig.production_columns_to_fill_null_with_zero,
+                config.production_columns_to_keep,
+                config.production_columns_to_fill_null_with_zero,
                 logger,
             )
             data['completions'][hash_dict['year']] = transform_completions(
                 pathlib.Path(hash_dict['completions_path']),
-                config.TransformConfig.completions_columns_to_keep,
-                config.TransformConfig.completions_columns_to_fill_null_with_zero,
+                config.completions_columns_to_keep,
+                config.completions_columns_to_fill_null_with_zero,
                 logger,
             )
 
         write_output_data(
             data,
             output_path,
-            config.TransformConfig.remove_CO2_wells,
+            config.remove_CO2_wells,
             logger,
         )
 

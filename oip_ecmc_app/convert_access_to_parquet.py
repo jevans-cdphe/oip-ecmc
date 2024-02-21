@@ -3,9 +3,11 @@ import logging
 import pathlib
 
 import polars as pl
+from spock.backend.wrappers import Spockspace
 
 import oip_ecmc.config as cfg
 import oip_ecmc.logger as lgr
+import oip_ecmc.setup as setup
 import oip_ecmc.utils as utils
 
 
@@ -53,18 +55,22 @@ class ODBCKey(utils.StrEnum):
 
 
 def main() -> None:
-    config = cfg.get_individial_config(cfg.ConvertDBConfig, DESCRIPTION)
-
-    ecmc_data_path = utils.str_to_path(config.ECMCConfig.ecmc_data_path)
-
-    logger = lgr.get_logger(
+    config, ecmc_data_path, logger = setup.setup_individual_script(
+        cfg.ConvertDBConfig,
+        DESCRIPTION,
         'convert_access_to_parquet',
-        config.ECMCConfig.log_level,
-        ecmc_data_path / config.ECMCConfig.log_directory,
     )
 
-    access_db_path = ecmc_data_path / config.ConvertDBConfig.access_db_directory
-    parquet_path = ecmc_data_path / config.ConvertDBConfig.parquet_directory
+    convert_access_to_parquet(config.ConvertDBConfig, ecmc_data_path, logger)
+
+
+def convert_access_to_parquet(
+    config: Spockspace,
+    ecmc_data_path: pathlib.Path,
+    logger: logging.Logger,
+) -> None:
+    access_db_path = ecmc_data_path / config.access_db_directory
+    parquet_path = ecmc_data_path / config.parquet_directory
     parquet_previous_versions_path = parquet_path / 'previous_versions'
     parquet_previous_versions_path.mkdir(parents=True, exist_ok=True)
 
@@ -88,7 +94,7 @@ def main() -> None:
         with parquet_metadata_path.open('w') as f:
             json.dump(utils.to_json(parquet_metadata, logger=logger), f)
 
-        driver = get_access_driver(config.ConvertDBConfig.microsoft_access_driver)
+        driver = get_access_driver(config.microsoft_access_driver)
         data = mdb_import(access_db_metadata, logger, driver=driver)
         write_parquet(parquet_path, data, logger)
 
