@@ -151,13 +151,15 @@ def transform_production(
         .agg([
             *[pl.col(c).sum() for c in [
                 *production_fillnull,
-                'Prod_days',
                 'boe_prod',
                 'BOEd',
             ]],
             *[pl.col(c).first() for c in [
                 'name',
                 'operator_num',
+            ]],
+            *[pl.col(c).max() for c in [
+                'Prod_days',
             ]],
         ])
         # Calculate GOR (MCF/bbl)

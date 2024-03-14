@@ -1,3 +1,7 @@
+# Temporary Documentation Notes
+
+- `BOEd` is calculated on a per-formation basis, and then summed for each well. `Prod_days` is the maximum of `Prod_days` for each formation. Because different formations could potentially have different `Prod_days` at a given well, the information used to calculate `BOEd` is lost in the data transformation, and a recalculation using the transformed data may result in different values than are in the `BOEd` column. Additionally, taking the maximum `Prod_days` may not be correct because there could potentially be activity days for one formation and not another, and vice-versa, therefore under-reporting `Prod_days` in the transformed data. This data loss and data discrepancy is not expected to be important, but is worth documenting.
+
 # Dependencies
 
 ## Python
