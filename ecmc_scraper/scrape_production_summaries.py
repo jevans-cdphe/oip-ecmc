@@ -1,18 +1,4 @@
-import datetime
-import json
-import logging
-import pathlib
-import zipfile
-
-import requests
-from spock.backend.wrappers import Spockspace
-
-import oip_ecmc.config as cfg
-import oip_ecmc.setup as setup
-import oip_ecmc.utils as utils
-
-
-DESCRIPTION = '''
+'''
 This script pulls Annual Production Summaries from the Colorado ECMC website and
 extracts them for use with the included convert_access_to_parquet.py script.
 
@@ -21,52 +7,48 @@ each Production Summary file.
 '''
 
 
-def main() -> None:
-    config, ecmc_data_path, logger = setup.setup_individual_script(
-        cfg.ScrapeConfig,
-        DESCRIPTION,
-        'scrape_from_ecmc',
-    )
+import datetime
+import json
+import logging
+import pathlib
+import zipfile
 
-    scrape_from_ecmc(config.ScrapeConfig, ecmc_data_path, logger)
+import requests
+
+from . import config as cfg
+from . import utils
 
 
-def scrape_from_ecmc(
-    config: Spockspace,
-    ecmc_data_path: pathlib.Path,
+def scrape(
+    config: cfg.ProductionSummariesConfig,
     logger: logging.Logger,
 ) -> None:
-    base_filenames = {
-        year: config.filename_template.replace('YYYY', str(year))
-        for year in config.years
-    }
-
-    zip_path = ecmc_data_path / config.zip_directory
-    zip_temp_path = zip_path / 'temp'
+    zip_temp_path = config.zip_dir / 'temp'
     zip_temp_path.mkdir(parents=True, exist_ok=True)
 
-    access_db_path = ecmc_data_path / config.access_db_directory
+    access_db_path = config.access_db_dir
     access_db_previous_versions_path = access_db_path / 'previous_versions'
     access_db_previous_versions_path.mkdir(parents=True, exist_ok=True)
 
     utils.remove_files(zip_temp_path, ['zip', 'json'], logger=logger)
 
-    downloaded_files = download_files(
-        config.production_summary_base_url,
-        base_filenames,
+    downloaded_files = _download_files(
+        config.years,
+        config.url_config,
         zip_temp_path,
         logger,
     )
 
-    zip_metadata = get_zip_metadata(downloaded_files, zip_path, logger)
+    zip_metadata = _get_zip_metadata(downloaded_files, config.zip_dir, logger)
 
     with (zip_temp_path / 'metadata.json').open('w') as f:
         json.dump(utils.to_json(zip_metadata, logger=logger), f)
 
-    if utils.new_hashes(zip_metadata, zip_path / 'metadata.json', logger=logger):
-        utils.remove_files(zip_path, ['zip', 'json'], logger=logger)
+    if utils.new_hashes(
+            zip_metadata, config.zip_dir / 'metadata.json', logger=logger):
+        utils.remove_files(config.zip_dir, ['zip', 'json'], logger=logger)
         utils.move_files(
-            zip_temp_path, zip_path, ['zip', 'json'], logger=logger)
+            zip_temp_path, config.zip_dir, ['zip', 'json'], logger=logger)
 
         utils.backup(
             access_db_path,
@@ -75,26 +57,26 @@ def scrape_from_ecmc(
             logger=logger,
         )
 
-        unzip_pulled_files(zip_path, access_db_path, logger)
+        _unzip_pulled_files(config.zip_dir, access_db_path, logger)
 
         with (access_db_path / 'metadata.json').open('w') as f:
             json.dump(
                 utils.to_json(
-                    get_db_metadata(access_db_path, zip_metadata, logger)),
+                    _get_db_metadata(access_db_path, zip_metadata, logger)),
                 f,
             )
 
 
-def download_files(
-    base_url: str,
-    filenames: list[str],
+def _download_files(
+    years: list[int],
+    url_config: cfg.ProductionSummariesUrlConfig,
     out_dir: pathlib.Path,
     logger: logging.Logger,
 ) -> dict[int, pathlib.Path]:
     to_return = {}
-    for year, f in filenames.items():
+    for year in years:
         try:
-            url = f'{base_url.strip("/")}/{f}.zip'.replace(" ", "%20")
+            url = url_config.url(year)
             response = requests.get(url)
             response.raise_for_status()
 
@@ -102,14 +84,14 @@ def download_files(
             logger.error(e)
             raise SystemExit(e)
 
-        to_return[year] = out_dir / f'{f}.zip'
+        to_return[year] = out_dir / url_config.zip_file_name(year)
         to_return[year].write_bytes(response.content)
         logger.info(f'downloaded {url} to {to_return[year]}')
 
     return to_return
 
 
-def get_zip_metadata(
+def _get_zip_metadata(
     downloaded_files: dict[int, str],
     zip_dir:pathlib.Path,
     logger: logging.Logger,
@@ -124,7 +106,7 @@ def get_zip_metadata(
     }
 
 
-def get_db_metadata(
+def _get_db_metadata(
     access_db_path: pathlib.Path,
     zip_metadata: dict[str, dict],
     logger: logging.Logger,
@@ -140,7 +122,7 @@ def get_db_metadata(
     return to_return
 
 
-def unzip_pulled_files(
+def _unzip_pulled_files(
     pull_dir: pathlib.Path,
     db_dir: pathlib.Path,
     logger: logging.Logger,
@@ -152,7 +134,3 @@ def unzip_pulled_files(
             continue
         with zipfile.ZipFile(pull_dir / f.name, 'r') as z:
             z.extractall(db_dir)
-
-
-if __name__ == '__main__':
-    main()

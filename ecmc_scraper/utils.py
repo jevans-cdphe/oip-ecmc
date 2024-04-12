@@ -107,26 +107,23 @@ def backup(
         if logger is not None:
             logger.info(f'metadata does not exist. wiping {path}')
         remove_files(path, ['json', filetype])
-  
-
-def to_json(
-        non_json_dict: dict, logger: Optional[logging.Logger] = None) -> dict:
-    return {k: _to_json(v) for k, v in non_json_dict.items()}
 
 
-def _to_json(non_json):
-    if isinstance(non_json, dict):
-        return to_json(non_json)
+def to_json(non_json, logger: Optional[logging.Logger] = None):
+    if isinstance(non_json, pathlib.Path) or isinstance(non_json, StrEnum):
+        return str(non_json)
+    elif isinstance(non_json, dict):
+        return _to_json_dict(non_json)
     elif isinstance(non_json, list):
         return _to_json_list(non_json)
-    return _to_json_item(non_json)
+    elif isinstance(non_json, tuple):
+        return _to_json_list(list(non_json))
+    return non_json
+
+
+def _to_json_dict(non_json_dict: dict) -> dict:
+    return {k: to_json(v) for k, v in non_json_dict.items()}
 
 
 def _to_json_list(non_json_list: list) -> list:
-    return [_to_json(i) for i in non_json_list]
-
-
-def _to_json_item(non_json_item):
-    if isinstance(non_json_item, pathlib.Path):
-        return str(non_json_item)
-    return non_json_item
+    return [to_json(i) for i in non_json_list]

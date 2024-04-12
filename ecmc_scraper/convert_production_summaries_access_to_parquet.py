@@ -1,16 +1,4 @@
-import json
-import logging
-import pathlib
-
-import polars as pl
-from spock.backend.wrappers import Spockspace
-
-import oip_ecmc.config as cfg
-import oip_ecmc.setup as setup
-import oip_ecmc.utils as utils
-
-
-DESCRIPTION = '''
+'''
 This script accepts Microsoft Access Database files pulled from the Colorado
 ECMC website using the included scrape_from_ecmc.py script.
 
@@ -23,12 +11,22 @@ Microsoft Windows operating systems.
 '''
 
 
+import json
+import logging
+import pathlib
+
+import polars as pl
+
+from . import config as cfg
+from . import utils
+
+
 class _MsAccessDriver(utils.StrEnum):
     x64 = r'{Microsoft Access Driver (*.mdb, *.accdb)}'
     x32 = r'{Microsoft Access Driver (*.mdb)}'
 
 
-def get_access_driver(access_driver: cfg.MsAccessDriver) -> _MsAccessDriver:
+def _get_access_driver(access_driver: cfg.MsAccessDriver) -> _MsAccessDriver:
     if access_driver == cfg.MsAccessDriver.x32:
         return _MsAccessDriver.x32
     return _MsAccessDriver.x64
@@ -53,36 +51,23 @@ class ODBCKey(utils.StrEnum):
     user_commit_sync = 'USERCOMMITSYNC'
 
 
-def main() -> None:
-    config, ecmc_data_path, logger = setup.setup_individual_script(
-        cfg.ConvertDBConfig,
-        DESCRIPTION,
-        'convert_access_to_parquet',
-    )
-
-    convert_access_to_parquet(config.ConvertDBConfig, ecmc_data_path, logger)
-
-
-def convert_access_to_parquet(
-    config: Spockspace,
-    ecmc_data_path: pathlib.Path,
+def convert(
+    config: cfg.ProductionSummariesConfig,
     logger: logging.Logger,
 ) -> None:
-    access_db_path = ecmc_data_path / config.access_db_directory
-    parquet_path = ecmc_data_path / config.parquet_directory
-    parquet_previous_versions_path = parquet_path / 'previous_versions'
+    parquet_previous_versions_path = config.parquet_dir / 'previous_versions'
     parquet_previous_versions_path.mkdir(parents=True, exist_ok=True)
 
-    with (access_db_path / 'metadata.json').open('r') as f:
+    with (config.access_db_dir / 'metadata.json').open('r') as f:
         access_db_metadata = json.load(f)
 
-    parquet_metadata = get_parquet_metadata(
-        access_db_metadata, parquet_path, logger)
-    parquet_metadata_path = parquet_path / 'metadata.json'
+    parquet_metadata = _get_parquet_metadata(
+        access_db_metadata, config.parquet_dir, logger)
+    parquet_metadata_path = config.parquet_dir / 'metadata.json'
 
     if utils.new_hashes(parquet_metadata, parquet_metadata_path, logger=logger):
         utils.backup(
-            parquet_path,
+            config.parquet_dir,
             parquet_previous_versions_path,
             'parquet',
             path_keys=['production_path', 'completions_path'],
@@ -93,17 +78,17 @@ def convert_access_to_parquet(
         with parquet_metadata_path.open('w') as f:
             json.dump(utils.to_json(parquet_metadata, logger=logger), f)
 
-        driver = get_access_driver(config.microsoft_access_driver)
-        data = mdb_import(access_db_metadata, logger, driver=driver)
-        write_parquet(parquet_path, data, logger)
+        driver = _get_access_driver(config.access_driver)
+        data = _mdb_import(access_db_metadata, logger, driver=driver)
+        _write_parquet(config.parquet_dir, data, logger)
 
 
-def odbc_connection_str(
+def _odbc_connection_str(
         connection: dict[ODBCKey, str], logger: logging.Logger) -> str:
     return ''.join([k + '=' + v + ';' for k, v in connection.items()])
 
 
-def read_odbc_table(
+def _read_odbc_table(
     table: MsAccessTable,
     connection: dict[ODBCKey, str],
     logger: logging.Logger,
@@ -111,10 +96,10 @@ def read_odbc_table(
     logger.info(f'loading data from {table} in {connection[ODBCKey.dbq]}')
     query = f'SELECT * FROM \"{table}\"'
     return pl.read_database(
-        query, connection=odbc_connection_str(connection, logger))
+        query, connection=_odbc_connection_str(connection, logger))
 
 
-def get_parquet_metadata(
+def _get_parquet_metadata(
     db_metadata: dict[str, dict],
     parquet_path: pathlib.Path,
     logger: logging.Logger,
@@ -134,7 +119,7 @@ def get_parquet_metadata(
     }
 
 
-def mdb_import(
+def _mdb_import(
     metadata: dict[int, str],
     logger: logging.Logger,
     driver: _MsAccessDriver = _MsAccessDriver.x64,
@@ -149,13 +134,13 @@ def mdb_import(
     for _, hash_dict in metadata.items():
         connection[ODBCKey.dbq] = hash_dict['path']
         for table in db_data:
-            db_data[table][hash_dict['year']] = read_odbc_table(
+            db_data[table][hash_dict['year']] = _read_odbc_table(
                 table, connection, logger)
 
     return db_data
 
 
-def write_parquet(
+def _write_parquet(
     out_dir: pathlib.Path,
     data: dict[MsAccessTable, dict[int, pl.DataFrame]],
     logger: logging.Logger,
@@ -163,7 +148,3 @@ def write_parquet(
     for table, year_dfs in data.items():
         for year, df in year_dfs.items():
             df.write_parquet(out_dir / f'{table}_{year}.parquet')
-
-
-if __name__ == '__main__':
-    main()

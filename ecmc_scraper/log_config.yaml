@@ -9,7 +9,7 @@ formatters:
     format: '[%(levelname)s|%(module)s|L%(lineno)d] %(asctime)s: %(message)s'
     datefmt: '%Y-%m-%dT%H:%M:%S%z'
   json:
-    (): oip_ecmc.logger.MyJSONFormatter
+    (): ecmc_scraper.logger.MyJSONFormatter
     fmt_keys:
       level: levelname
       message: message
@@ -32,7 +32,7 @@ handlers:
     maxBytes: 10000
     backupCount: 3
   z_queue_listener:
-    class: oip_ecmc.logger.QueueListenerHandler
+    class: ecmc_scraper.logger.QueueListenerHandler
     handlers:
       - cfg://handlers.stderr
       - cfg://handlers.file_json

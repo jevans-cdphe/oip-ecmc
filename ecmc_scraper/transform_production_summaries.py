@@ -1,80 +1,64 @@
-import json
-import logging
-import pathlib
-
-import polars as pl
-from spock.backend.wrappers import Spockspace
-
-import oip_ecmc.config as cfg
-import oip_ecmc.setup as setup
-import oip_ecmc.utils as utils
-
-
-DESCRIPTION = '''
+'''
 This script accepts parquet files made using the included
 convert_access_to_parquet.py script and transforms them into the data format
 that Ben Hmiel used at the start of this project.
 '''
 
 
-def main() -> None:
-    config, ecmc_data_path, logger = setup.setup_individual_script(
-        cfg.TransformConfig,
-        DESCRIPTION,
-        'transform_ecmc',
-    )
+import json
+import logging
+import pathlib
 
-    transform_ecmc(config.TransformConfig, ecmc_data_path, logger)
+import polars as pl
+
+from . import config as cfg
+from . import utils
 
 
-def transform_ecmc(
-    config: Spockspace,
-    ecmc_data_path: pathlib.Path,
+def transform(
+    config: cfg.ProductionSummariesConfig,
     logger: logging.Logger,
 ) -> None:
-    parquet_dir = ecmc_data_path / config.parquet_directory
-
-    with (parquet_dir / 'metadata.json').open('r') as f:
+    with (config.parquet_dir / 'metadata.json').open('r') as f:
         parquet_metadata = json.load(f)
 
-    output_path = ecmc_data_path / config.output_directory
-    output_previous_versions_path = output_path / 'previous_versions'
+    output_previous_versions_path = config.export_dir / 'previous_versions'
     output_previous_versions_path.mkdir(parents=True, exist_ok=True)
         
-    output_metadata = get_output_metadata(parquet_metadata, output_path, logger)
-    output_metadata_path = output_path / 'metadata.json'
+    output_metadata = _get_output_metadata(parquet_metadata, config.export_dir, logger)
+    output_metadata_path = config.export_dir / 'metadata.json'
 
     if utils.new_hashes(output_metadata, output_metadata_path, logger=logger):
         utils.backup(
-            output_path, output_previous_versions_path, 'csv', logger=logger)
+            config.export_dir, output_previous_versions_path, 'csv', logger=logger)
 
         with output_metadata_path.open('w') as f:
             json.dump(utils.to_json(output_metadata, logger=logger), f)
 
         data = {'production': {}, 'completions': {}}
         for _, hash_dict in parquet_metadata.items():
-            data['production'][hash_dict['year']] = transform_production(
+            data['production'][hash_dict['year']] = _transform_production(
                 pathlib.Path(hash_dict['production_path']),
-                config.production_columns_to_keep,
-                config.production_columns_to_fill_null_with_zero,
+                config.transform_config.production_columns_to_keep,
+                config.transform_config.production_columns_to_fill_null_with_zero,
                 logger,
             )
-            data['completions'][hash_dict['year']] = transform_completions(
+            data['completions'][hash_dict['year']] = _transform_completions(
                 pathlib.Path(hash_dict['completions_path']),
-                config.completions_columns_to_keep,
-                config.completions_columns_to_fill_null_with_zero,
+                config.transform_config.completions_columns_to_keep,
+                config.transform_config.completions_columns_to_fill_null_with_zero,
                 logger,
             )
 
-        write_output_data(
+        _write_output_data(
             data,
-            output_path,
-            config.remove_CO2_wells,
+            config.export_dir,
+            config.transform_config.remove_CO2_wells,
             logger,
         )
 
 
-def get_output_metadata(
+def _get_output_metadata(
     parquet_metadata: dict,
     output_path: pathlib.Path,
     logger: logging.Logger,
@@ -89,8 +73,8 @@ def get_output_metadata(
     }
 
 
-def write_output_data(
-    data: dict[int, pl.DataFrame],
+def _write_output_data(
+    data: dict[str, dict[int, pl.DataFrame]],
     output_path: pathlib.Path,
     remove_co2_wells: bool,
     logger: logging.Logger,
@@ -106,7 +90,7 @@ def write_output_data(
         df_out.write_csv(output_path / f'{year}.csv')
 
 
-def transform_production(
+def _transform_production(
     parquet_path: pathlib.Path,
     production_keep: list[str],
     production_fillnull: list[str],
@@ -187,7 +171,7 @@ def transform_production(
     ).collect()
 
 
-def transform_completions(
+def _transform_completions(
     parquet_path: pathlib.Path,
     completions_keep: list[str],
     completions_fillnull: list[str],
@@ -205,7 +189,3 @@ def transform_completions(
             for col in completions_fillnull
         ])
     ).collect()
-
-
-if __name__ == '__main__':
-    main()
