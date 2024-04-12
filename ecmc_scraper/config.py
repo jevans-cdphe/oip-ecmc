@@ -2,27 +2,7 @@ from dataclasses import dataclass
 import pathlib
 from typing import Optional
 
-from . import logger
-from . import utils
-
-
-class MsAccessDriver(utils.StrEnum):
-    '''
-    Most modern Windows installations will have/use the x64 driver.
-    '''
-    x64 = 'x64'
-    x32 = 'x32'
-
-
-class OutputType(utils.StrEnum):
-    '''
-    Currently only csv is supported
-    '''
-    csv = 'csv'
-    # ipc = 'ipc'
-    # parquet = 'parquet'
-    # avro = 'avro'
-    # excel = 'excel'
+from . import enum
 
 
 @dataclass(frozen=True)
@@ -69,11 +49,11 @@ class ProductionSummariesUrlConfig:
 @dataclass(frozen=True)
 class ProductionSummariesConfig:
     access_db_dir: pathlib.Path
-    access_driver: MsAccessDriver
-    export_type: OutputType
+    access_driver: enum.MsAccessDriver
+    export_type: enum.OutputType
     export_dir: pathlib.Path
     log_dir: pathlib.Path
-    log_level: logger.LogLevel
+    log_level: enum.LogLevel
     parquet_dir: pathlib.Path
     quiet: bool
     show_config: bool

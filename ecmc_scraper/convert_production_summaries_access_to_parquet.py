@@ -18,37 +18,14 @@ import pathlib
 import polars as pl
 
 from . import config as cfg
+from . import enum
 from . import utils
 
 
-class _MsAccessDriver(utils.StrEnum):
-    x64 = r'{Microsoft Access Driver (*.mdb, *.accdb)}'
-    x32 = r'{Microsoft Access Driver (*.mdb)}'
-
-
-def _get_access_driver(access_driver: cfg.MsAccessDriver) -> _MsAccessDriver:
-    if access_driver == cfg.MsAccessDriver.x32:
-        return _MsAccessDriver.x32
-    return _MsAccessDriver.x64
-
-
-class MsAccessTable(utils.StrEnum):
-    production = 'Colorado Annual Production'
-    completions = 'Colorado Well Completions'
-
-
-class ODBCKey(utils.StrEnum):
-    driver = 'Driver'
-    max_buffer_size = 'MAXBUFFERSIZE'
-    dsn = 'DSN'
-    dbq = 'DBQ'
-    description = 'DESCRIPTION'
-    exclusive = 'EXCLUSIVE'
-    page_timeout = 'PAGETIMEOUT'
-    read_only = 'READONLY'
-    system_database = 'SYSTEMDB'
-    threads = 'THREADS'
-    user_commit_sync = 'USERCOMMITSYNC'
+access_driver_map = {
+    enum.MsAccessDriver.x64: r'{Microsoft Access Driver (*.mdb, *.accdb)}',
+    enum.MsAccessDriver.x32: r'{Microsoft Access Driver (*.mdb)}',
+}
 
 
 def convert(
@@ -78,22 +55,22 @@ def convert(
         with parquet_metadata_path.open('w') as f:
             json.dump(utils.to_json(parquet_metadata, logger=logger), f)
 
-        driver = _get_access_driver(config.access_driver)
-        data = _mdb_import(access_db_metadata, logger, driver=driver)
+        data = _mdb_import(
+            access_db_metadata, logger, driver=config.access_driver)
         _write_parquet(config.parquet_dir, data, logger)
 
 
 def _odbc_connection_str(
-        connection: dict[ODBCKey, str], logger: logging.Logger) -> str:
+        connection: dict[enum.ODBCKey, str], logger: logging.Logger) -> str:
     return ''.join([k + '=' + v + ';' for k, v in connection.items()])
 
 
 def _read_odbc_table(
-    table: MsAccessTable,
-    connection: dict[ODBCKey, str],
+    table: enum.MsAccessTable,
+    connection: dict[enum.ODBCKey, str],
     logger: logging.Logger,
 ) -> pl.DataFrame:
-    logger.info(f'loading data from {table} in {connection[ODBCKey.dbq]}')
+    logger.info(f'loading data from {table} in {connection[enum.ODBCKey.dbq]}')
     query = f'SELECT * FROM \"{table}\"'
     return pl.read_database(
         query, connection=_odbc_connection_str(connection, logger))
@@ -110,9 +87,9 @@ def _get_parquet_metadata(
             'year': hash_dict['year'],
             'db_path': pathlib.Path(hash_dict['path']),
             'production_path': parquet_path \
-                / f'{MsAccessTable.production}_{hash_dict["year"]}.parquet',
+                / f'{enum.MsAccessTable.production}_{hash_dict["year"]}.parquet',
             'completions_path': parquet_path \
-                / f'{MsAccessTable.completions}_{hash_dict["year"]}.parquet',
+                / f'{enum.MsAccessTable.completions}_{hash_dict["year"]}.parquet',
             'timestamp': hash_dict['timestamp']
         }
         for sha_hash, hash_dict in db_metadata.items()
@@ -122,17 +99,21 @@ def _get_parquet_metadata(
 def _mdb_import(
     metadata: dict[int, str],
     logger: logging.Logger,
-    driver: _MsAccessDriver = _MsAccessDriver.x64,
-    tables: list[MsAccessTable] = [
-        MsAccessTable.production,
-        MsAccessTable.completions,
+    driver: enum.MsAccessDriver = enum.MsAccessDriver.x64,
+    tables: list[enum.MsAccessTable] = [
+        enum.MsAccessTable.production,
+        enum.MsAccessTable.completions,
     ],
-) -> dict[MsAccessTable, dict[int, pl.DataFrame]]:
+) -> dict[enum.MsAccessTable, dict[int, pl.DataFrame]]:
     db_data = {table: {} for table in tables}
-    connection = {ODBCKey.driver: driver, ODBCKey.dbq: ''}
+
+    connection = {
+        enum.ODBCKey.driver: access_driver_map[driver],
+        enum.ODBCKey.dbq: '',
+    }
 
     for _, hash_dict in metadata.items():
-        connection[ODBCKey.dbq] = hash_dict['path']
+        connection[enum.ODBCKey.dbq] = hash_dict['path']
         for table in db_data:
             db_data[table][hash_dict['year']] = _read_odbc_table(
                 table, connection, logger)
@@ -142,7 +123,7 @@ def _mdb_import(
 
 def _write_parquet(
     out_dir: pathlib.Path,
-    data: dict[MsAccessTable, dict[int, pl.DataFrame]],
+    data: dict[enum.MsAccessTable, dict[int, pl.DataFrame]],
     logger: logging.Logger,
 ) -> None:
     for table, year_dfs in data.items():

@@ -1,18 +1,12 @@
 import datetime
-import enum
 import hashlib
 import json
 import logging
 import pathlib
 from typing import List, Optional
 
+from .enum import StrEnum
 
-# Have to do this because StrEnum, which handles this conversion only got added
-# in Python 3.11
-class StrEnum(str, enum.Enum):
-  def __str__(self) -> str:
-    return self.value
-  
 
 def str_to_path(
         path_str: str, logger: Optional[logging.Logger] = None) -> pathlib.Path:

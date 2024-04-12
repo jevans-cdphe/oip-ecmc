@@ -10,7 +10,9 @@ from rich.syntax import Syntax
 import typer
 
 from . import config as cfg
+from . import const
 from . import convert_production_summaries_access_to_parquet as convert_prod
+from . import enum
 from . import logger as lgr
 from . import package_info
 from . import scrape_production_summaries as scrape_prod
@@ -18,64 +20,7 @@ from . import transform_production_summaries as transform_prod
 from . import utils
 
 
-DEFAULT_DIR = pathlib.Path.home() / 'Documents/ecmc-data'
-
-DEFAULT_URL_CONFIG = {
-    'base_url': 'https://ecmc.state.co.us/documents/data/downloads/production/',
-    'zip_file_template': {
-        'default': 'co YYYY Annual Production Summary-xp',
-        1999: 'co YYYY Annual Production Summary-XP',
-        2000: 'co YYYY Annual Production Summary-XP',
-    },
-}
-
-DEFAULT_TRANSFORM_CONFIG = {
-    'remove_CO2_wells': True,
-    'production_columns_to_keep': [
-        'name',
-        'operator_num',
-        'API_num',
-        'Prod_days',
-        'gas_btu_sales',
-        'gas_sales',
-        'gas_shrinkage',
-        'gas_used_on_lease',
-        'flared_vented',
-        'oil_adjustment',
-        'oil_gravity',
-        'oil_sales',
-        'gas_prod',
-        'oil_prod',
-        'water_prod',
-    ],
-    'completions_columns_to_keep': [
-        'facility_name',
-        'facility_num',
-        'well_name',
-        'API_num',
-        'well_bore_status',
-        'county',
-        'lat',
-        'long',
-        'first_prod_date',
-        'gas_type',
-    ],
-    'production_columns_to_fill_null_with_zero': [
-        'gas_btu_sales',
-        'gas_sales',
-        'gas_shrinkage',
-        'gas_used_on_lease',
-        'flared_vented',
-        'oil_adjustment',
-        'oil_gravity',
-        'oil_sales',
-        'gas_prod',
-        'oil_prod',
-        'water_prod',
-    ],
-    'completions_columns_to_fill_null_with_zero': ['gas_type'],
-}
-
+default_dir = pathlib.Path.home() / 'Documents/ecmc-data'
 app = typer.Typer(no_args_is_help=True)
 url_config_from_global_config_file = None
 transform_config_from_global_config_file = None
@@ -127,19 +72,12 @@ def get_default_config(ctx: typer.Context) -> dict:
     config_dict = {
         p.name: p.default
         for p in ctx.command.params
-        if p.name not in (
-            'config_option',
-            'transform_config',
-            'url_config',
-            'version',
-            'show_default_config',
-            'write_default_config_to_file'
-        )
+        if p.name not in const.NON_CONFIG_OPTIONS
     }
 
-    config_dict['transform_config'] = DEFAULT_TRANSFORM_CONFIG
-    config_dict['url_config'] = DEFAULT_URL_CONFIG
-    config_dict['years'] = [2020, 2021, 2022, 2023]
+    config_dict['transform_config'] = const.DEFAULT_TRANSFORM_CONFIG
+    config_dict['url_config'] = const.DEFAULT_URL_CONFIG
+    config_dict['years'] = const.DEFAULT_YEARS
 
     return utils.to_json(config_dict)
 
@@ -186,9 +124,9 @@ def production_summaries(
         typer.Option(
             min=1999,
             max=datetime.datetime.now().year,
-            help='a list of the report years desired, e.g. 2020 2021 2022 2023',
+            help='a list of the report years desired.',
         ),
-    ] = [2020, 2021, 2022, 2023],
+    ] = const.DEFAULT_YEARS,
     version: Annotated[
         bool,
         typer.Option(
@@ -243,14 +181,14 @@ def production_summaries(
             show_default=False,
         ),
     ] = None,
-    log_level: lgr.LogLevel = lgr.LogLevel.INFO,
-    zip_dir: pathlib.Path = DEFAULT_DIR / 'production-summaries/zip',
-    access_db_dir: pathlib.Path = DEFAULT_DIR / 'production-summaries/access-db',
-    parquet_dir: pathlib.Path = DEFAULT_DIR / 'production-summaries/parquet',
-    log_dir: pathlib.Path = DEFAULT_DIR / 'production-summaries/logs',
-    export_dir: pathlib.Path = DEFAULT_DIR / 'production-summaries/export',
-    access_driver: cfg.MsAccessDriver = cfg.MsAccessDriver.x64,
-    export_type: cfg.OutputType = cfg.OutputType.csv,
+    log_level: enum.LogLevel = enum.LogLevel.INFO,
+    zip_dir: pathlib.Path = default_dir / 'production-summaries/zip',
+    access_db_dir: pathlib.Path = default_dir / 'production-summaries/access-db',
+    parquet_dir: pathlib.Path = default_dir / 'production-summaries/parquet',
+    log_dir: pathlib.Path = default_dir / 'production-summaries/logs',
+    export_dir: pathlib.Path = default_dir / 'production-summaries/export',
+    access_driver: enum.MsAccessDriver = enum.MsAccessDriver.x64,
+    export_type: enum.OutputType = enum.OutputType.csv,
     transform: Annotated[
         bool,
         typer.Option(
@@ -282,8 +220,8 @@ def production_summaries(
             abort = True,
         )
 
-    url_config_data = DEFAULT_URL_CONFIG
-    transform_config_data = DEFAULT_TRANSFORM_CONFIG
+    url_config_data = const.DEFAULT_URL_CONFIG
+    transform_config_data = const.DEFAULT_TRANSFORM_CONFIG
 
     if url_config_from_global_config_file is not None:
         url_config_data.update(url_config_from_global_config_file)
@@ -300,14 +238,7 @@ def production_summaries(
     config_dict = {
         k: v
         for k, v in ctx.params.items()
-        if k not in (
-            'config_option',
-            'transform_config',
-            'url_config',
-            'version',
-            'show_default_config',
-            'write_default_config_to_file'
-        )
+        if k not in const.NON_CONFIG_OPTIONS
     }
 
     config_dict['transform_config'] = transform_config_data

@@ -1,8 +1,0 @@
-log_level: INFO
-years: [2020, 2021, 2022, 2023]
-production_summary_base_url: https://ecmc.state.co.us/documents/data/downloads/production/
-ecmc_data_path: ~/Documents/ecmc/
-zip_directory: ECMC pull
-access_db_directory: ECMC db
-log_directory: logs
-filename_template: co YYYY Annual Production Summary-xp
