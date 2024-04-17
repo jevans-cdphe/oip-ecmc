@@ -8,11 +8,9 @@ readme = "README.md"
 [tool.poetry.dependencies]
 python = "^3.9"
 polars = "^0.20.7"
-spock-config = "^3.1.0"
 arrow-odbc = "^4.0.0"
 requests = "^2.31.0"
 typer = {extras = ["all"], version = "^0.12.3"}
-typer-config = {extras = ["yaml"], version = "^1.4.0"}
 pyyaml = "^6.0.1"
 
 [tool.poetry.scripts]

@@ -9,12 +9,12 @@ from rich.console import Console
 from rich.syntax import Syntax
 import typer
 
+from . import __version__, __copyright__, __maintainer__, __email__
 from . import config as cfg
 from . import const
 from . import convert_production_summaries_access_to_parquet as convert_prod
 from . import enum
 from . import logger as lgr
-from . import package_info
 from . import scrape_production_summaries as scrape_prod
 from . import transform_production_summaries as transform_prod
 from . import utils
@@ -33,10 +33,10 @@ def version_callback(ctx: typer.Context, value: bool):
     if not value:
         return value
 
-    print(f'ECMC Scraper version {package_info.__version__}')
-    print(package_info.__copyright__)
-    print(f'\nMaintainer:\n{package_info.__maintainer__}')
-    print(package_info.__email__)
+    print(f'ECMC Scraper version {__version__}')
+    print(__copyright__)
+    print(f'\nMaintainer:\n{__maintainer__}')
+    print(__email__)
 
     raise typer.Exit()
 
