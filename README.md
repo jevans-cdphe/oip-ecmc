@@ -12,7 +12,7 @@ pip install ecmc-scraper
 
 Optional:
 ```bash
-ecmc-scraper --install-completions
+ecmc-scraper --install-completion
 ```
 
 Currently, only production summaries are implemented.
