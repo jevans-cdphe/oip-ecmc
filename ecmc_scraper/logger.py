@@ -9,46 +9,7 @@ from typing import Optional, Union
 
 import yaml
 
-from . import utils
-
-
-LOG_RECORD_BUILTIN_ATTRS = {
-    "args",
-    "asctime",
-    "created",
-    "exc_info",
-    "exc_text",
-    "filename",
-    "funcName",
-    "levelname",
-    "levelno",
-    "lineno",
-    "module",
-    "msecs",
-    "message",
-    "msg",
-    "name",
-    "pathname",
-    "process",
-    "processName",
-    "relativeCreated",
-    "stack_info",
-    "thread",
-    "threadName",
-    "taskName",
-}
-
-
-class LogLevel(utils.StrEnum):
-    '''
-    Level of detail of logging. DEBUG is the most verbose, and CRITICAL is the
-    least.
-    '''
-    DEBUG = 'DEBUG'
-    INFO = 'INFO'
-    WARNING = 'WARNING'
-    ERROR = 'ERROR'
-    CRITICAL = 'CRITICAL'
+from . import const
 
 
 def get_logger(
@@ -162,7 +123,7 @@ class MyJSONFormatter(logging.Formatter):
         message.update(always_fields)
 
         for key, val in record.__dict__.items():
-            if key not in LOG_RECORD_BUILTIN_ATTRS:
+            if key not in const.LOG_RECORD_BUILTIN_ATTRS:
                 message[key] = val
 
         return message

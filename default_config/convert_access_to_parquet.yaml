@@ -1,6 +1,0 @@
-log_level: INFO
-ecmc_data_path: ~/Documents/ecmc/
-access_db_directory: ECMC db
-parquet_directory: ECMC parquet
-log_directory: logs
-microsoft_access_driver: x64
