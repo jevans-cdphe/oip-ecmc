@@ -79,7 +79,7 @@ def get_default_config(ctx: typer.Context) -> dict:
     config_dict['url_config'] = const.DEFAULT_URL_CONFIG
     config_dict['years'] = const.DEFAULT_YEARS
 
-    return utils.to_json(config_dict)
+    return utils.to_json(config_dict) # type: ignore
 
 
 def config_callback(ctx: typer.Context, value):
@@ -89,11 +89,12 @@ def config_callback(ctx: typer.Context, value):
     conf = yaml.safe_load(value)
 
     if 'url_config' in conf:
-        url_config_from_global_config_file = yaml.safe_dump(conf['url_config'])
+        global url_config_from_global_config_file
+        url_config_from_global_config_file = conf['url_config']
 
     if 'transform_config' in conf:
-        transform_config_from_global_config_file = yaml.safe_dump(
-            conf['transform_config'])
+        global transform_config_from_global_config_file
+        transform_config_from_global_config_file = conf['transform_config']
 
     for k in conf.keys():
         if k.endswith('_dir'):

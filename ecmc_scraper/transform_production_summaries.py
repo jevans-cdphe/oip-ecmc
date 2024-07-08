@@ -87,7 +87,7 @@ def _write_output_data(
         )
         if remove_co2_wells:
             df_out = df_out.filter(pl.col('Prod_days') != 0)
-        df_out.write_csv(output_path / f'{year}.csv')
+        df_out.write_csv(output_path / f'{year}.csv', date_format='%F', time_format='%F')
 
 
 def _transform_production(
