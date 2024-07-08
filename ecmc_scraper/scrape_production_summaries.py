@@ -39,7 +39,7 @@ def scrape(
         logger,
     )
 
-    zip_metadata = _get_zip_metadata(downloaded_files, config.zip_dir, logger)
+    zip_metadata = _get_zip_metadata(downloaded_files, config.zip_dir, logger) # type: ignore
 
     with (zip_temp_path / 'metadata.json').open('w') as f:
         json.dump(utils.to_json(zip_metadata, logger=logger), f)
@@ -97,8 +97,8 @@ def _get_zip_metadata(
     logger: logging.Logger,
 ) -> dict[str, dict]:
     return {
-        utils.hash_file(f, logger=logger): {
-            'path': zip_dir / f.name,
+        utils.hash_file(f, logger=logger): { # type: ignore
+            'path': zip_dir / f.name, # type: ignore
             'year': year,
             'timestamp': datetime.datetime.now().isoformat(),
         }

@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "ecmc-scraper"
-version = "0.2.0"
+version = "0.2.1"
 description = "Scrapes the ECMC download page. Includes transform scripts used by CDPHE OIP team."
 authors = ["John Evans <john.p.evans@state.co.us>"]
 readme = "README.md"

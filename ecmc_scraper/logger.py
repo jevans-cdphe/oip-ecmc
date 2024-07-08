@@ -46,9 +46,9 @@ def _resolve_queue(q):
         return q['__resolved_value__']
 
     cname = q.pop('class')
-    klass = q.configurator.resolve(cname)
+    klass = q.configurator.resolve(cname) # type: ignore
     props = q.pop('.', None)
-    kwargs = {k: q[k] for k in q if logging.config.valid_ident(k)}
+    kwargs = {k: q[k] for k in q if logging.config.valid_ident(k)} # type: ignore
     result = klass(**kwargs)
     if props:
         for name, value in props.items():

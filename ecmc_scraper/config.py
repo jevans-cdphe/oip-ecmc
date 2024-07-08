@@ -40,7 +40,7 @@ class ProductionSummariesUrlConfig:
         if year not in self.yearly_zip_file_templates:
             return f'{self.default_zip_file_template.replace("YYYY", str(year))}.zip'
         
-        return f'{self.zip_file_templates[year].replace("YYYY", str(year))}.zip'
+        return f'{self.zip_file_templates[year].replace("YYYY", str(year))}.zip' # type: ignore
 
     def url(self, year: int) -> str:
         return f'{self.base_url.strip("/")}/{self.zip_file_name(year)}'.replace(" ", "%20")

@@ -113,9 +113,9 @@ def _mdb_import(
     }
 
     for _, hash_dict in metadata.items():
-        connection[enum.ODBCKey.dbq] = hash_dict['path']
+        connection[enum.ODBCKey.dbq] = hash_dict['path'] # type: ignore
         for table in db_data:
-            db_data[table][hash_dict['year']] = _read_odbc_table(
+            db_data[table][hash_dict['year']] = _read_odbc_table( # type: ignore
                 table, connection, logger)
 
     return db_data
